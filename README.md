@@ -1,11 +1,18 @@
-# Tezos staking
+# Tezos staking on AWS cloud
+
+> Baking Tezos on server in AWS cloud
+
+**Your takeaways from this post**
+- Deploy a baking node to stake Tezos in testnet
+- Semi automated infrastructure deployment (terraform, cloud-config, AWS, snapshot)
+- A setup to obtain high security for your funds
+- Some basic monitoring and steps to fix commum issues
 
 ## Prerequites
 - AWS account
 - Terraform Cli and cloud account (free)
 
 ## Deploy Server Infra
-
 - Clone this repo and go to dir: `cd terraform` 
 - Init: `terraform init`
 - Plan: `terraform plan`
@@ -21,9 +28,6 @@ Terraform + cloud-init should have run and and server should be ready. Please ru
 - Tezos binaries: `ls -la /usr/local/bin/tezos*`
 
 ### Build and run from source (recommended)
-<details>
-    <summary>Click to expand</summary>
-
 Setup node on testnet (carthagenet) 
 ```
 tezos-node identity generate
@@ -82,8 +86,6 @@ ps -aux | grep tezos
 journalctl -u tezos-[baker|endorser|accuser|node] -ef  # Choose -u unit
 ```
 Check your baker status, rolls, payouts on Tezos [explorer](https://carthagenet.tezblock.io/account/tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu)
-</details>
-
 
 ## Delegate more Tezos to your baker
 - From your or friend laptop, install a tezos wallet. We will use `Tezos-client` and the same steps as our server `Build and run from source`
@@ -113,8 +115,6 @@ tezos-client show ledger ledger://XXXXXXXXX   # display info
   - More info:
     -  https://tezos.gitlab.io/master/whitedoc/proof_of_stake.html
     - https://tezos.stackexchange.com/questions/456/security-deposit-calculation
-
-
 
 ## To do
 - [ ] Security: signer or separate baker vs node?
