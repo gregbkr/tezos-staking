@@ -1,0 +1,140 @@
+#cloud-config
+# EDIT THIS FILE AND RUNNING AGAIN TERRAFORM WILL CAUSE EBS DISK TO BE RECREATED!!! TAKE SNAPSHOT OF DATA DISK BEFORE!
+repo_update: true
+repo_upgrade: all
+
+swap:
+  filename: /swapfile
+  size: "auto"
+  maxsize: 16000000
+
+users:
+  - default
+  - name: tezos
+    ssh-authorized-keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDGR+LDVp47T50Be/uKvBm22jDI+Gfj1lqUkZmafa6YG1vfGoYADlg9BXSSMTeLrkY6xHQgbehBwyM2NyWqTZu15zHDC8QzezsB/rfi1e8NFzT/z0YgNRPL7Fvd5r8U+410uAOfs/a3nVP8NYSJDL9iJYA+HnxLNShLo+dwIuZ2nrJkdrINONrkSRbhezypZZxZEyTTQAjarU1/77f0vvm6d8S69NgflAohbVCqqVg1Lp9TiPB7tJOfL9URscvQIMRDkEtv5pccF6Us6XrX+DIyNslIH3to9FP/jUwX02uC9mX8QY3BUCFJaTesQFLhizu4SB3BEm7DUsHKQSGMpS/T gregbk1@laptopasus
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+
+apt:
+  sources:
+    source: ppa:avsm/ppa
+
+packages:
+ - git
+ - unzip
+ - nmap
+ - rsync 
+ - m4 
+ - build-essential
+ - patch
+ - wget
+ - pkg-config
+ - libgmp-dev
+ - libev-dev
+ - libhidapi-dev
+ - libffi-dev
+ - opam
+ - jq
+
+write_files:
+  - path: /run/install_tezos.sh
+    permissions: '0755'
+    content: |
+      echo "INSTALL TEZOS SCRIPT"
+      git clone https://gitlab.com/tezos/tezos.git
+      cd tezos
+      git checkout latest-release
+      opam init --bare -a
+      make build-deps
+      eval $(opam env)
+      make
+      sudo cp tezos-* /usr/local/bin/.
+      source ./src/bin_client/bash-completion.sh
+  - path: /etc/systemd/system/tezos-node.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Tezos Node
+      After=network.target auditd.service
+      Wants=network.target
+      
+      [Service]
+      WorkingDirectory=/home/tezos
+      ExecStart=/usr/local/bin/tezos-node run --rpc-addr 127.0.0.1 --net-addr 127.0.0.1:18732
+      User=tezos
+      Group=tezos
+      Restart=always
+      RestartSec=5s
+
+      [Install]
+      WantedBy=multi-user.target
+      Alias=tezos-node.service
+  - path: /etc/systemd/system/tezos-baker.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Tezos Baker
+      After=network.target auditd.service
+      Wants=network.target
+      
+      [Service]
+      WorkingDirectory=/home/tezos
+      ExecStart=/usr/local/bin/tezos-baker-006-PsCARTHA run with local node ~/.tezos-node chef
+      User=tezos
+      Group=tezos
+      Restart=always
+      RestartSec=5s
+
+      [Install]
+      WantedBy=multi-user.target
+      Alias=tezos-baker.service
+  - path: /etc/systemd/system/tezos-endorser.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Tezos Endorcer
+      After=network.target auditd.service
+      Wants=network.target
+      
+      [Service]
+      WorkingDirectory=/home/tezos
+      ExecStart=/usr/local/bin/tezos-endorcer-006-PsCARTHA run
+      User=tezos
+      Group=tezos
+      Restart=always
+      RestartSec=5s
+
+      [Install]
+      WantedBy=multi-user.target
+      Alias=tezos-endorcer.service
+  - path: /etc/systemd/system/tezos-accuser.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Tezos Accuser
+      After=network.target auditd.service
+      Wants=network.target
+      
+      [Service]
+      WorkingDirectory=/home/tezos
+      ExecStart=/usr/local/bin/tezos-accuser-006-PsCARTHA run
+      User=tezos
+      Group=tezos
+      Restart=always
+      RestartSec=5s
+
+      [Install]
+      WantedBy=multi-user.target
+      Alias=tezos-accuser.service
+
+runcmd:
+  - swapon -s
+  - runuser -l tezos -c '/run/install_tezos.sh'
+  - systemctl daemon-reload
+
+final_message: "The system is finally up, after $UPTIME seconds"
