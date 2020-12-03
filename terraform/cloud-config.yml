@@ -37,6 +37,7 @@ packages:
  - opam
  - jq
 
+# A good guide about systemd and tezos https://github.com/etomknudsen/tezos-baking
 write_files:
   - path: /run/install_tezos.sh
     permissions: '0755'
@@ -62,75 +63,76 @@ write_files:
       
       [Service]
       WorkingDirectory=/home/tezos
-      ExecStart=/usr/local/bin/tezos-node run --rpc-addr 127.0.0.1 --net-addr 127.0.0.1:18732
+      ExecStart=/usr/local/bin/tezos-node run --rpc-addr 127.0.0.1:8732
       User=tezos
       Group=tezos
-      Restart=always
-      RestartSec=5s
+      Restart=on-failure
 
       [Install]
       WantedBy=multi-user.target
-      Alias=tezos-node.service
+      RequiredBy=tezos-baker.service tezos-endorser.service tezos-accuser.service
   - path: /etc/systemd/system/tezos-baker.service
     permissions: 0644
     owner: root
     content: |
       [Unit]
       Description=Tezos Baker
-      After=network.target auditd.service
       Wants=network.target
-      
+      BindsTo=tezos-node.service
+      After=tezos-node.service
+
       [Service]
       WorkingDirectory=/home/tezos
-      ExecStart=/usr/local/bin/tezos-baker-006-PsCARTHA run with local node ~/.tezos-node chef
+      ExecStartPre=/bin/sleep 1
+      ExecStart=/usr/local/bin/tezos-baker-006-PsCARTHA run with local node /home/tezos/.tezos-node chef
       User=tezos
       Group=tezos
-      Restart=always
+      Restart=on-failure
       RestartSec=5s
 
       [Install]
       WantedBy=multi-user.target
-      Alias=tezos-baker.service
+      
   - path: /etc/systemd/system/tezos-endorser.service
     permissions: 0644
     owner: root
     content: |
       [Unit]
       Description=Tezos Endorcer
-      After=network.target auditd.service
       Wants=network.target
+      BindsTo=tezos-node.service
+      After=tezos-node.service
       
       [Service]
       WorkingDirectory=/home/tezos
-      ExecStart=/usr/local/bin/tezos-endorcer-006-PsCARTHA run
+      ExecStartPre=/bin/sleep 1
+      ExecStart=/usr/local/bin/tezos-endorser-006-PsCARTHA run
       User=tezos
       Group=tezos
-      Restart=always
-      RestartSec=5s
+      Restart=on-failure
 
       [Install]
       WantedBy=multi-user.target
-      Alias=tezos-endorcer.service
   - path: /etc/systemd/system/tezos-accuser.service
     permissions: 0644
     owner: root
     content: |
       [Unit]
       Description=Tezos Accuser
-      After=network.target auditd.service
       Wants=network.target
+      BindsTo=tezos-node.service
+      After=tezos-node.service
       
       [Service]
       WorkingDirectory=/home/tezos
+      ExecStartPre=/bin/sleep 1
       ExecStart=/usr/local/bin/tezos-accuser-006-PsCARTHA run
       User=tezos
       Group=tezos
       Restart=always
-      RestartSec=5s
 
       [Install]
       WantedBy=multi-user.target
-      Alias=tezos-accuser.service
 
 runcmd:
   - swapon -s

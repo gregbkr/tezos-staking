@@ -52,9 +52,13 @@ tezos-client rpc get /chains/main/blocks/head/header/shell
 ```
 Create account 
 ```
-tezos-client gen keys chef
+tezos-client gen keys chef --encrypted
 tezos-client list known contracts
 tezos-client list known addresses
+```
+Backup your keys for chef somewhere very safe:
+```
+cat ~/.tezos-client/secret_keys
 ```
 Use https://faucet.tzalpha.net/ to get the tz1.json file
 ```
@@ -69,23 +73,29 @@ tezos-client show address chef
 # tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu
 tezos-client register key chef as delegate
 ```
-Check?
+Check our current cycle [here](https://carthagenet.tezblock.io/). The command below should return our baking right in this or next cycle 
 ```
-tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights\?cycle=300\&delegate=tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu\&max_priority=2
-(this fails...)
+tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights\?cycle=412\&delegate=tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu\&max_priority=2
+
+[ { "level": 845854, "delegate": "tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu",
+    "priority": 0, "estimated_time": "2020-11-03T21:10:47Z" },
+  { "level": 845927, "delegate": "tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu",
+    "priority": 1, "estimated_time": "2020-11-03T21:47:57Z" },
+  { "level": 846883, "delegate": "tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu",
+    "priority": 0, "estimated_time": "2020-11-04T05:45:17Z" },
+  { "level": 846988, "delegate": "tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu",
+    "priority": 0, "estimated_time": "2020-11-04T06:37:47Z" } ]
 ```
 Run baker, endorser, accuser
 ```
-sudo systemctl status tezos-baker
-sudo systemctl status tezos-endorser
-sudo systemctl status tezos-accuser
+sudo systemctl status tezos-node.service tezos-baker.service tezos-endorser.service tezos-accuser.service
 ```
 Check
 ```
 ps -aux | grep tezos
 journalctl -u tezos-[baker|endorser|accuser|node] -ef  # Choose -u unit
 ```
-Check your baker status, rolls, payouts on Tezos [explorer](https://carthagenet.tezblock.io/account/tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu)
+Check your baking/endorsing rights and rewards on Tezos [explorer](https://carthagenet.tezblock.io/account/tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu)
 
 ## Delegate more Tezos to your baker
 - From your or friend laptop, install a tezos wallet. We will use `Tezos-client` and the same steps as our server `Build and run from source`
@@ -104,26 +114,43 @@ tezos-client show ledger ledger://XXXXXXXXX   # display info
 - Delegate all tezos in `ledger` account to our baker `chef` address: `tezos-client set delegate for ledger_rc to chef`
 - (Optional) to un-delegate: `tezos-client withdraw delegate from <implicit_account>`
 
-
-## Staking info
+## Staking faq
 - Tz inflation: `~ 5%`
 - 1 roll: 8000tz = minimum amount to start baking
-- Security Deposit:
-  - `BLOCK_SECURITY_DEPOSIT = 512 ꜩ` per block created 
-  - `ENDORSEMENT_SECURITY_DEPOSIT = 64 ꜩ` per endorsement slot
-  - Security deposit need vs total staking: `~ 9%`. (if you stake 100 000tz from clients and yourselft, your baker needs 10 000tz in sec dep)
-  - More info:
-    -  https://tezos.gitlab.io/master/whitedoc/proof_of_stake.html
+- Stated staking, when I will see the first rewards: 
+  - Need to wait the current cycle (25 days in mainnet, half in testnet) to be finished, they you will be included for the next one. Check Tezos [explorer](https://carthagenet.tezblock.io/account/tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu)
+- Security Deposit: how much Tz to you need to keep on your baker, if you plan to stake 100 000Tz in total (you and delegation from user)
+  - Info: 
+    - `BLOCK_SECURITY_DEPOSIT = 512 ꜩ` per block created 
+    - `ENDORSEMENT_SECURITY_DEPOSIT = 64 ꜩ` per endorsement slot
+  - => Security deposit need vs total staking: `~ 9%` => so we will need around 10 000Tz on your baker server.
+  - Calculation explation:
+    - https://tezos.gitlab.io/master/whitedoc/proof_of_stake.html
     - https://tezos.stackexchange.com/questions/456/security-deposit-calculation
 
+## Monitoring
+
+[Kiln](https://gitlab.com/tezos-kiln/kiln/-/blob/develop/docs/config.md) is a great monitoring tools, but heavy.
+
+## Security
+
+- Open only port 9732 to the world, close everything else
+- Don't open ssh to world, use bastion or AWS SSM 
+- Protect baker secret key (hot wallet):
+  - Encrypt secret key on cloud VM (`tesos-client gen key chef --encrypt`)
+  - Or better, use remote signer from a controlled raspberry at home + ledger nano attached
+  - Or use cloud HSM with project [1](https://github.com/tacoinfra/remote-signer), [2](https://github.com/ecadlabs/signatory), be aware then might be still in beta...
+
 ## To do
-- [ ] Security: signer or separate baker vs node?
-- [ ] Monitor baking
-- [ ] Amount to put in deposit
-- [x] Activate snapshot 
-  - [ ] Test Tezos or AWS Snapshot on new VM
-- [ ] Migrate baker Server to final server
-  - [ ] Use systemctl instead of noup
+- [x] Security: signer or separate baker vs node? 
+- [x] Use node in --private-mode? don't need, overkill
+- [x] Monitor baking -> kiln: not sure as heavy, monitor systemd instead + telegram/email alert
+- [x] Amount to put in deposit (can be ledger protected? Yes, with ledger baking app)
+- [x] Tezos Snapshot or VM snapshot?
+- [x] Migrate baker Server to final server
+  - [x] Use systemctl instead of noup
+  - [ ] Recover keys
+  - [ ] Recover blockchain from snapshot
 
 ## Annexes
 
@@ -138,3 +165,7 @@ Export a snapshot:
 tezos-client rpc get /chains/main/blocks/head | more
 tezos-node snapshot export --block BLgwgZno23eeCk4vfBZaKAwQCFsxTBFUE2wNnMUReH8bLwNjN47 Download/cartha-BLgwgZno23eeCk4vfBZaKAwQCFsxTBFUE2wNnMUReH8bLwNjN47.export
 ```
+
+My test nodes:
+- [Manual test](https://carthagenet.tezblock.io/account/tz1MobkJA1cr9oLh8RG5GACRcP1tp8NzXgAu?tab=Delegations)
+- [Remote signer test](https://carthagenet.tezblock.io/account/tz1a5b4k4varsfcfRNpSSbGeKTXqarUhq3n1)
